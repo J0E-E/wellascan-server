@@ -1,59 +1,65 @@
-import { Request, Response, NextFunction } from 'express'
-import jwt from 'jsonwebtoken'
-import { IUser } from '../models/User'
-import { promisify } from 'node:util'
-import User from '../models/User'
+import { NextFunction, Request, Response } from 'express'
+import User, { IUser } from '../models/User'
 import config from '../config/config'
+import { AuthPayload, jwtVerifyAsync } from '../utils/authUtils'
+import { sendCaughtError, sendError } from '../utils/responseUtils'
+import { StatusCodes } from 'http-status-codes'
 
-// add user key/value to Request object
+
+/**
+ * Interface representing an authenticated request.
+ * Extends the base Request object to include the authenticated user.
+ *
+ * @property user - The authenticated user associated with the request.
+ */
 export interface IAuthRequest extends Request {
 	user: IUser
 }
 
-// promisify jwt.verify()
-const verifyAsync = promisify(jwt.verify) as (
-	token: string,
-	secret: string,
-) => Promise<jwt.JwtPayload>
 
-// authorization middleware for logging in
+/**
+ * Middleware function to enforce authentication on a route.
+ * Validates the presence of an authorization header with a valid JWT token.
+ * If valid, retrieves the user associated with the token and attaches it to the request object.
+ * Calls the next middleware in the chain if authentication is successful.
+ * Sends an error response if authentication fails.
+ *
+ * @param request - The incoming HTTP request object.
+ * @param response - The HTTP response object.
+ * @param next - A callback to pass control to the next middleware function.
+ * @returns A promise that resolves to void.
+ */
 const requireAuth = async (request: Request, response: Response, next: NextFunction): Promise<void> => {
-	// cast to allow for user.
-	const authRequest = request as IAuthRequest
-
-	// pull bearer token from headers
-	const { authorization } = authRequest.headers
-
+	// Validate and clean auth header
+	const { authorization } = request.headers
 	if (!authorization) {
-		response.status(401).send({ error: 'You must be logged in to perform this action.' })
-		return
+		return sendError(response, 'You must be logged in to perform this action.', StatusCodes.UNAUTHORIZED)
 	}
-
-	// remove the prefix to get just the JWT token
 	const token = authorization.replace('Bearer ', '')
 
-	let payload: jwt.JwtPayload
-
+	// Validate token
+	let payload: AuthPayload
 	try {
-		payload = await verifyAsync(token, config.jwtSecret)
-	} catch (error) {
-		response.status(401).send({ error: 'You must be logged in to perform this action.' })
-		return
+		payload = await jwtVerifyAsync(token, config.jwtSecret)
+	} catch (error: unknown){
+		if (
+			typeof error === 'object' &&
+			error !== null &&
+			'name' in error &&
+			(error as { name: string }).name === 'TokenExpiredError'
+		) {
+			return sendError(response, 'You must be logged in to perform this action.', StatusCodes.UNAUTHORIZED)
+		}
+		return sendCaughtError(response, error, 'Something went wrong validating token.')
 	}
 
-	if (typeof payload !== 'object' || payload === null || !('userId' in payload)) {
-		response.status(401).send({ error: 'Invalid token payload' })
-		return
-	}
+	// Look-up User
+	const { userId } = payload
+	const user = await User.findById(userId)
+	if (!user) return sendError(response, 'You must be logged in to perform this action.', StatusCodes.UNAUTHORIZED)
 
-	const { userId } = payload as jwt.JwtPayload
-	const user = await User.findById(userId) as IUser | null
-
-	if (!user || !(user instanceof User)) {
-		response.status(401).send({ error: 'You must be logged in to perform this action.' })
-		return
-	}
-
+	// Set user and move on.
+	const authRequest = request as IAuthRequest
 	authRequest.user = user
 	next()
 }

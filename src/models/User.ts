@@ -1,13 +1,33 @@
 import { Document, model, Model, Schema } from 'mongoose'
 import bcrypt from 'bcrypt'
 
+/**
+ * Represents a user entity.
+ * Extends the Document interface.
+ *
+ * Properties:
+ * - _id: Unique identifier for the user.
+ * - email: Email address of the user.
+ * - password: Hashed password of the user.
+ *
+ * Methods:
+ * - comparePasswords: Compares a given password with the user's stored password.
+ */
 export interface IUser extends Document {
+	_id: string
 	email: string
 	password: string
 
 	comparePasswords(candidatePassword: string): Promise<boolean>
 }
 
+/**
+ * Defines the schema for a user entity.
+ *
+ * Represents the structure for user data, including email and password fields.
+ * - `email`: Stores the user's email address. Must be unique and is required.
+ * - `password`: Stores the user's password. It is required.
+ */
 const userSchema = new Schema<IUser>({
 	email: {
 		type: String,
@@ -20,21 +40,24 @@ const userSchema = new Schema<IUser>({
 	},
 })
 
+/**
+ * Compares the provided password with the stored hashed password.
+ *
+ * @param candidatePassword - The plain text password to compare.
+ * @returns A promise that resolves to a boolean indicating whether the passwords match.
+ */
 userSchema.methods.comparePasswords = async function(candidatePassword: string): Promise<boolean> {
 	const user = this as IUser
-	try {
-		return await bcrypt.compare(candidatePassword, user.password)
-	} catch (error) {
-		throw error
-	}
+	return await bcrypt.compare(candidatePassword, user.password)
 }
 
-// pre-save function to check for password change and hash the value
-userSchema.pre<IUser>('save', function(next) {
-	const user = this
 
+/**
+ *  A pre-save hook to hash the password value before storing to the DB.
+ */
+userSchema.pre<IUser>('save', function(next) {
 	// no need to do anything if no change detected.
-	if (!user.isModified('password')) {
+	if (!this.isModified('password')) {
 		return next()
 	}
 
@@ -43,10 +66,10 @@ userSchema.pre<IUser>('save', function(next) {
 		if (error) next(error)
 
 		// hash the password using the generated salt, and the user.password value.
-		bcrypt.hash(user.password, salt, (error, hash) => {
+		bcrypt.hash(this.password, salt, (error, hash) => {
 			if (error) next(error)
 
-			user.password = hash
+			this.password = hash
 			next()
 		})
 	})

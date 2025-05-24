@@ -1,7 +1,6 @@
 import app from './app'
 import config from './config/config'
 import mongoose from 'mongoose'
-import e from 'express'
 
 const startServer = async () => {
 	try {
@@ -23,3 +22,9 @@ const startServer = async () => {
 }
 
 startServer()
+	.then(() => {
+		console.log('Server started successfully');
+	})
+	.catch((err) => {
+		console.error('Failed to start server:', err);
+	});
