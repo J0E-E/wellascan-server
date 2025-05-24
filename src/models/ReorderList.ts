@@ -167,6 +167,12 @@ const reorderListSchema = new Schema<IReorderList>({
 	}],
 }, { timestamps: true })
 
+export const AddProductSchema = z.object({
+	sku: z.string(),
+	name: z.string(),
+	quantity: z.number(),
+	listId: z.string(),
+})
 
 /**
  * Adds a product to the reorder list.
@@ -181,7 +187,7 @@ reorderListSchema.methods.addProduct = async function(
 	sku: string,
 	name: string,
 	quantity: number,
-	listId: mongoose.Schema.Types.ObjectId,
+	listId: string,
 ) {
 	const productToReorder = new ReorderProduct({
 		sku,

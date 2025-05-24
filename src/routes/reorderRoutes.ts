@@ -3,6 +3,7 @@ import { StatusCodes } from 'http-status-codes'
 
 import requireAuth, { IAuthRequest } from '../middleware/requireAuth'
 import {
+	AddProductSchema,
 	IReorderList,
 	IReorderProduct,
 	QuantityAdjustmentSchema,
@@ -76,19 +77,19 @@ reorderRoutes.get('/list/:id', async (request: Request, response: Response) => {
 
 // Add Product to list
 reorderRoutes.post('/addproduct/:listId', async (request: Request, response: Response) => {
-	// Validate request body
-	const { listId } = request.params
-	const parseResult = QuantityAdjustmentSchema.safeParse(request.body)
-	if (!parseResult.success) {
-		return sendError(response, 'Invalid data send in request body.')
-	}
-
 	// Validate list exists
+	const { listId } = request.params
 	const reorderList = await ReorderList.findById(listId).populate('productsToReorder')
 	if (!reorderList) {
 		sendError(response, 'No list found by that ID.', StatusCodes.NOT_FOUND)
 		return
 	}
+	// Validate request body
+	const parseResult = AddProductSchema.safeParse({ ...request.body, listId })
+	if (!parseResult.success) {
+		return sendError(response, 'Invalid data sent in request body.')
+	}
+
 
 	const { sku, name, quantity } = request.body
 	try {
@@ -135,7 +136,7 @@ reorderRoutes.post('/adjustProductQuantity/:productId', async (request: Request,
 
 		const messages = {
 			updated: 'Product successfully adjusted.',
-			deleted: 'Product successfully deleted.'
+			deleted: 'Product successfully deleted.',
 		} as const
 
 		return sendSuccess(response, updateAction === 'deleted' ? [] : product, messages[updateAction])
