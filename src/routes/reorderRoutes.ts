@@ -1,35 +1,35 @@
 import { Request, Response, Router } from 'express'
 import { StatusCodes } from 'http-status-codes'
 
-import requireAuth, { IAuthRequest } from '../middleware/requireAuth'
+import requireAuth from '../middleware/requireAuth'
 import {
 	AddProductSchema,
 	IReorderList,
 	IReorderProduct,
+	ListSchema,
 	QuantityAdjustmentSchema,
 	ReorderList,
 	ReorderProduct,
 } from '../models/ReorderList'
 import { sendCaughtError, sendError, sendSuccess } from '../utils/responseUtils'
+import { getUserId } from '../utils/authUtils'
 
 const reorderRoutes = Router()
 
 reorderRoutes.use(requireAuth)
 
-// Add New List Route
-reorderRoutes.post('/addlist', async (request: Request, response: Response) => {
+// Add new list
+reorderRoutes.post('/list', async (request: Request, response: Response) => {
 	// Get User information
-	const authRequest = request as IAuthRequest
-	const { _id: userId } = authRequest.user
+	const userId = getUserId(request)
 
-	// Get payload information
-	const { listName } = request.body
-	if (!listName) {
-		sendError(response, 'Missing required field: listName')
-	}
+	// Validate request data
+	const parsedBody = ListSchema.safeParse(request.body)
+	if (!parsedBody.success) return sendError(response, 'Invalid request data.', StatusCodes.BAD_REQUEST)
+	const { name } = parsedBody.data
 
 	// Create List
-	const reorderList = new ReorderList({ userId, listName })
+	const reorderList = new ReorderList({ userId, name })
 
 	try {
 		// Save List and return success
@@ -41,13 +41,14 @@ reorderRoutes.post('/addlist', async (request: Request, response: Response) => {
 	}
 })
 
-// Get Lists Route
-reorderRoutes.get('/lists', async (request: Request, response: Response) => {
+// Get all lists
+reorderRoutes.get('/list', async (request: Request, response: Response) => {
 	try {
-		const reorderLists = await ReorderList.find()
+		const userId = getUserId(request)
+		const reorderLists = await ReorderList.find({ userId })
 
 		if (!reorderLists || reorderLists.length === 0) {
-			return sendSuccess(response, [], 'No lists found', StatusCodes.NOT_FOUND)
+			return sendSuccess<[]>(response, [], 'No lists found', StatusCodes.NOT_FOUND)
 		}
 		return sendSuccess<IReorderList[]>(response, reorderLists, 'Lists successfully found.')
 
@@ -75,8 +76,47 @@ reorderRoutes.get('/list/:id', async (request: Request, response: Response) => {
 	}
 })
 
-// Add Product to list
-reorderRoutes.post('/addproduct/:listId', async (request: Request, response: Response) => {
+// Change list name
+reorderRoutes.patch('/list/:listId', async (request: Request, response: Response) => {
+	try {
+		//Validate list
+		const { listId } = request.params
+		const reorderList = await ReorderList.findById(listId)
+		if (!reorderList) return sendError(response, 'List not found.', StatusCodes.NOT_FOUND)
+
+		// Validate request data
+		const parsedBody = ListSchema.safeParse(request.body)
+		if (!parsedBody.success) return sendError(response, 'Invalid data in request.', StatusCodes.BAD_REQUEST)
+
+		// Update list
+		const { name } = parsedBody.data
+		reorderList.name = name
+		await reorderList.save()
+
+		return sendSuccess<IReorderList>(response, reorderList, 'List updated.')
+	} catch (error) {
+		sendCaughtError(response, error, 'Something went wrong updating list.')
+	}
+})
+
+// Delete list
+reorderRoutes.delete('/list/:listId', async (request: Request, response: Response) => {
+	try {
+		// Validate list
+		const { listId } = request.params
+		const reorderList = await ReorderList.findById(listId)
+		if (!reorderList) return sendError(response, 'List not found.', StatusCodes.NOT_FOUND)
+
+		// Delete list
+		await reorderList.deleteOne()
+		sendSuccess<null>(response, null, 'List successfully deleted.')
+	} catch (error) {
+		sendCaughtError(response, error, 'Something went wrong deleting list.')
+	}
+})
+
+// Add Product
+reorderRoutes.post('/product/:listId', async (request: Request, response: Response) => {
 	// Validate list exists
 	const { listId } = request.params
 	const reorderList = await ReorderList.findById(listId).populate('productsToReorder')
@@ -89,7 +129,6 @@ reorderRoutes.post('/addproduct/:listId', async (request: Request, response: Res
 	if (!parseResult.success) {
 		return sendError(response, 'Invalid data sent in request body.')
 	}
-
 
 	const { sku, name, quantity } = request.body
 	try {
@@ -114,8 +153,8 @@ reorderRoutes.post('/addproduct/:listId', async (request: Request, response: Res
 	}
 })
 
-// Adjust product on list
-reorderRoutes.post('/adjustProductQuantity/:productId', async (request: Request, response: Response) => {
+// Adjust product
+reorderRoutes.patch('/product/:productId', async (request: Request, response: Response) => {
 	try {
 		// validate request body
 		const parseResult = QuantityAdjustmentSchema.safeParse(request.body)
@@ -139,7 +178,7 @@ reorderRoutes.post('/adjustProductQuantity/:productId', async (request: Request,
 			deleted: 'Product successfully deleted.',
 		} as const
 
-		return sendSuccess(response, updateAction === 'deleted' ? [] : product, messages[updateAction])
+		return sendSuccess<IReorderProduct | null>(response, updateAction === 'deleted' ? null : product, messages[updateAction])
 
 	} catch (error) {
 		sendCaughtError(response, error, 'Something went wrong adjusting product quantity.')
@@ -147,6 +186,19 @@ reorderRoutes.post('/adjustProductQuantity/:productId', async (request: Request,
 })
 
 // Delete product
-// Delete list
+reorderRoutes.delete('/product/:productId', async (request: Request, response: Response) => {
+	try {
+		// Validate list
+		const { productId } = request.params
+		const reorderProduct = await ReorderProduct.findById(productId)
+		if (!reorderProduct) return sendError(response, 'Product not found.', StatusCodes.NOT_FOUND)
+
+		// Delete list
+		await reorderProduct.deleteOne()
+		sendSuccess<null>(response, null, 'Product successfully deleted.')
+	} catch (error) {
+		sendCaughtError(response, error, 'Something went wrong deleting product.')
+	}
+})
 
 export default reorderRoutes

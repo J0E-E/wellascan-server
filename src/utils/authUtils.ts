@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import jwt from 'jsonwebtoken'
 import config from '../config/config'
+import { IAuthRequest } from '../middleware/requireAuth'
+import {Request} from 'express'
 
 
 /**
@@ -51,3 +53,11 @@ export const generateTokens = (payload: AuthPayload): { token: string, refreshTo
 
 	return { token, refreshToken }
 }
+
+/**
+ * Retrieves the user ID from the given request object.
+ *
+ * @param request - The request object containing user authentication details.
+ * @returns The user ID extracted from the request.
+ */
+export const getUserId = (request: Request) => (request as IAuthRequest).user._id

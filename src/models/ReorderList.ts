@@ -126,7 +126,7 @@ reorderProductSchema.methods.adjustQuantity = async function(type: QuantityAdjus
  *
  * Properties:
  * - userId: Identifier of the user associated with the reorder list.
- * - listName: Name of the reorder list.
+ * - name: Name of the reorder list.
  * - productsToReorder: Collection of products to be reordered.
  *
  * Methods:
@@ -135,7 +135,7 @@ reorderProductSchema.methods.adjustQuantity = async function(type: QuantityAdjus
 export interface IReorderList extends Document {
 	_id: mongoose.Schema.Types.ObjectId
 	userId: mongoose.Schema.Types.ObjectId
-	listName: string
+	name: string
 	productsToReorder: IReorderProduct[]
 	addProduct: (sku: string, name: string, quantity: number, listId: mongoose.Schema.Types.ObjectId) => Promise<void>
 }
@@ -146,7 +146,7 @@ export interface IReorderList extends Document {
  * Represents a user's shopping list with products marked for reordering.
  *
  * @param userId Identifier of the user to whom the list belongs.
- * @param listName Unique name of the reorder list.
+ * @param name Unique name of the reorder list.
  * @param productsToReorder Array of products associated with the reorder list.
  * @param timestamps Automatically managed creation and update timestamps.
  */
@@ -156,7 +156,7 @@ const reorderListSchema = new Schema<IReorderList>({
 		ref: 'User',
 		required: true,
 	},
-	listName: {
+	name: {
 		type: String,
 		required: true,
 		unique: true,
@@ -167,11 +167,17 @@ const reorderListSchema = new Schema<IReorderList>({
 	}],
 }, { timestamps: true })
 
+// Expected body for add product
 export const AddProductSchema = z.object({
 	sku: z.string(),
 	name: z.string(),
 	quantity: z.number(),
 	listId: z.string(),
+})
+
+// Expected body for patch list
+export const ListSchema = z.object({
+	name: z.string()
 })
 
 /**
