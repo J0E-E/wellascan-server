@@ -48,7 +48,7 @@ reorderRoutes.get('/list', async (request: Request, response: Response) => {
 		const reorderLists = await ReorderList.find({ userId })
 
 		if (!reorderLists || reorderLists.length === 0) {
-			return sendSuccess<[]>(response, [], 'No lists found', StatusCodes.NOT_FOUND)
+			return sendSuccess<[]>(response, [], 'No lists found')
 		}
 		return sendSuccess<IReorderList[]>(response, reorderLists, 'Lists successfully found.')
 
