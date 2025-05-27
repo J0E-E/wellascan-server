@@ -70,10 +70,19 @@ export const sendCaughtError = (
 	backupMessage: string
 ) => {
 	console.error(error)
-	const message =
-		error && typeof error === 'object' && 'message' in error
-			? (error as { message: string }).message
-			: backupMessage
 
-	sendError(response, message)
+	const message =
+		error && typeof error === 'object' && 'code' in error && error.code === 11000
+				// Handle Mongoose Duplicate Entry Error
+				? 'Duplicate entry found.'
+				: error && typeof error === 'object' && 'message' in error
+					? (error as { message: string }).message
+					: backupMessage
+
+	const status = (error && typeof error === 'object' && 'code' in error && error.code === 11000)
+		// Handle Mongoose Duplicate Entry Error
+		? StatusCodes.BAD_REQUEST
+		: StatusCodes.INTERNAL_SERVER_ERROR
+
+	sendError(response, message, status)
 }
