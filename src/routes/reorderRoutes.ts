@@ -64,7 +64,7 @@ reorderRoutes.get('/list/:id', async (request: Request, response: Response) => {
 
 	try {
 		// Validate list exists
-		const reorderList = await ReorderList.findById(id)
+		const reorderList = await ReorderList.findById(id).populate('productsToReorder')
 		if (!reorderList) {
 			return sendError(response, 'List not found.', StatusCodes.NOT_FOUND)
 		}

@@ -48,7 +48,7 @@ export const jwtVerifyAsync = (token: string, secret: string): Promise<AuthPaylo
  * @returns An object containing the token and refreshToken.
  */
 export const generateTokens = (payload: AuthPayload): { token: string, refreshToken: string } => {
-	const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1h' })
+	const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1m' })
 	const refreshToken = jwt.sign(payload, config.jwtRefreshSecret, { expiresIn: '3d' })
 
 	return { token, refreshToken }
